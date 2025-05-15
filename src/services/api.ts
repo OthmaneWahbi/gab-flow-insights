@@ -2,6 +2,10 @@
 import { ATMData } from '../context/AppContext';
 import * as XLSX from 'xlsx';
 
+// — helper : force tout numéro GAB en string —
+const asKey = (v: unknown) => String(v).trim();
+
+
 // Chemins vers les fichiers Excel
 const DATA_FOLDER = '/data';
 const PREVISIONS_PATH = `${DATA_FOLDER}/previsions.xlsx`;
@@ -83,6 +87,9 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
       console.log("Données de pondération chargées:", ponderation.length, "entrées");
     }
   }
+  const ponderationMap: Record<string, number> = Object.fromEntries(
+    ponderation.map((p: any) => [asKey(p['Numero GAB']), Number(p.ponderation)])
+  );
   
   if (previsionsExists) {
     const previsionsData = await loadExcelFile(PREVISIONS_PATH);
@@ -111,17 +118,17 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
     // Fusionner avec les données de pondération (inner join)
     const criticalAtmsWithPonderation = criticalAtms
       .map((atm: any) => {
-        const gabPonderation = ponderation.find((p: any) => p['Numero GAB'] === atm['Numero GAB']);
-        if (gabPonderation) {
-          return {
-            'Numero GAB': atm['Numero GAB'],
-            'Cash Disponible': atm['Cash Disponible'],
-            'ponderation': gabPonderation.ponderation
-          };
-        }
-        return null;
+        const ponder = ponderationMap[asKey(atm['Numero GAB'])];
+        return ponder !== undefined
+          ? {
+              'Numero GAB': atm['Numero GAB'],
+              'Cash Disponible': atm['Cash Disponible'],
+              'ponderation': ponder
+            }
+          : null;
       })
-      .filter((item: any) => item !== null);
+      .filter(Boolean);
+
     
     // 2. Récupérer les prévisions pour les 7 prochains jours
     const today = new Date();
@@ -154,7 +161,7 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
     // 5. Agréger par GAB pour obtenir la consommation totale sur 7 jours
     const sum7Days: { [key: number]: { consoTotal: number, cashDispo: number } } = {};
     crossJoin.forEach((item: any) => {
-      const gabId = item['Numero GAB'];
+      const gabId = asKey(item['Numero GAB']);
       if (!sum7Days[gabId]) {
         sum7Days[gabId] = {
           consoTotal: 0,
@@ -176,7 +183,7 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
     // 7. Préparer les résultats pour le front-end avec toutes les informations nécessaires
     const processedData: ATMData[] = atmStateData.map((atm: any) => {
       // Convertir le numéro GAB en nombre pour faire correspondre avec le résultat
-      const gabId = atm['Numero GAB'];
+      const gabId = asKey(atm['Numero GAB']);
       const gabResult = result[gabId];
       
       // Trouver la pondération pour ce GAB
