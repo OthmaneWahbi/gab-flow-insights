@@ -51,6 +51,22 @@ const loadExcelFile = async (path: string): Promise<any | null> => {
   }
 };
 
+// Convertir une chaîne de date en objet Date
+const parseDate = (dateStr: string | number | Date): Date => {
+  // Si c'est déjà un objet Date, on le retourne tel quel
+  if (dateStr instanceof Date) return dateStr;
+  
+  // Si c'est un nombre (timestamp Excel), on le convertit
+  if (typeof dateStr === 'number') {
+    // Convertir le numéro de série Excel en date JavaScript
+    const excelEpoch = new Date(1899, 11, 30);
+    return new Date(excelEpoch.getTime() + (dateStr * 24 * 60 * 60 * 1000));
+  }
+  
+  // Sinon, on essaie de parser la chaîne de caractères
+  return new Date(dateStr);
+};
+
 // Traiter les données de l'état des GABs
 const processAtmData = async (atmStateData: any[], uploadId: string): Promise<ATMData[]> => {
   // Vérifier et charger les fichiers de pondération et de prévisions
@@ -71,7 +87,10 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
   if (previsionsExists) {
     const previsionsData = await loadExcelFile(PREVISIONS_PATH);
     if (previsionsData) {
-      previsions = previsionsData;
+      previsions = previsionsData.map((item: any) => ({
+        ...item,
+        Date: parseDate(item.Date) // S'assurer que la date est un objet Date
+      }));
       console.log("Données de prévisions chargées:", previsions.length, "entrées");
     }
   }
@@ -84,56 +103,127 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
   
   // Sinon, on fait le traitement
   console.log("Traitement des données réelles");
-  const today = new Date();
   
-  // Filtrer les prévisions pour les 7 prochains jours
-  const nextWeekPrevisions = previsions.filter((prev: any) => {
-    const prevDate = new Date(prev.Date);
-    return prevDate >= today && prevDate <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-  });
-  
-  // Traitement des données selon la logique décrite
-  const processedData: ATMData[] = atmStateData.map((atm: any) => {
-    // Trouver la pondération pour ce GAB
-    const gabPonderation = ponderation.find((p: any) => p['Numero GAB'] === atm['Numero GAB']);
-    const ponderationValue = gabPonderation ? gabPonderation.ponderation : 0;
+  try {
+    // 1. Filtrer les GABs critiques (Nbr JOUR <= 3)
+    const criticalAtms = atmStateData.filter((atm: any) => atm['Nbr JOUR'] <= 3);
     
-    // Calculer la consommation moyenne sur 7 jours
-    let consoMoyenne7j = 0;
-    if (nextWeekPrevisions.length > 0) {
-      const totalConso = nextWeekPrevisions.reduce((sum: number, prev: any) => {
-        return sum + (prev.conso_journaliere * ponderationValue);
-      }, 0);
-      consoMoyenne7j = totalConso / nextWeekPrevisions.length;
-    }
+    // Fusionner avec les données de pondération (inner join)
+    const criticalAtmsWithPonderation = criticalAtms
+      .map((atm: any) => {
+        const gabPonderation = ponderation.find((p: any) => p['Numero GAB'] === atm['Numero GAB']);
+        if (gabPonderation) {
+          return {
+            'Numero GAB': atm['Numero GAB'],
+            'Cash Disponible': atm['Cash Disponible'],
+            'ponderation': gabPonderation.ponderation
+          };
+        }
+        return null;
+      })
+      .filter((item: any) => item !== null);
     
-    // Calculer le montant à investir
-    const somme7jours = consoMoyenne7j * 7;
-    const aInvestir = Math.max(0, somme7jours - atm['Cash Disponible']);
+    // 2. Récupérer les prévisions pour les 7 prochains jours
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normaliser à minuit
     
-    return {
-      numeroGAB: atm['Numero GAB'],
-      nomGAB: atm['Mon GAB'],
-      cashDisponible: atm['Cash Disponible'],
-      nbrJour: atm['Nbr JOUR'],
-      consoMoyenne7j,
-      aInvestir
+    const next7DaysPrevisions = previsions.filter((prev: any) => {
+      const prevDate = new Date(prev.Date);
+      return prevDate >= today && prevDate < new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    });
+    
+    // 3. Créer un produit cartésien (cross join) entre GABs critiques et prévisions
+    const crossJoin: any[] = [];
+    criticalAtmsWithPonderation.forEach((atm: any) => {
+      next7DaysPrevisions.forEach((prev: any) => {
+        crossJoin.push({
+          'Numero GAB': atm['Numero GAB'],
+          'Cash Disponible': atm['Cash Disponible'],
+          'ponderation': atm.ponderation,
+          'Date': prev.Date,
+          'conso_journaliere': prev.conso_journaliere
+        });
+      });
+    });
+    
+    // 4. Calculer la consommation pour chaque GAB à chaque date
+    crossJoin.forEach((item: any) => {
+      item.conso_gab = item.conso_journaliere * item.ponderation;
+    });
+    
+    // 5. Agréger par GAB pour obtenir la consommation totale sur 7 jours
+    const sum7Days: { [key: number]: { consoTotal: number, cashDispo: number } } = {};
+    crossJoin.forEach((item: any) => {
+      const gabId = item['Numero GAB'];
+      if (!sum7Days[gabId]) {
+        sum7Days[gabId] = {
+          consoTotal: 0,
+          cashDispo: item['Cash Disponible']
+        };
+      }
+      sum7Days[gabId].consoTotal += item.conso_gab;
+    });
+    
+    // 6. Calculer le montant à investir (consommation 7 jours - cash disponible, minimum 0)
+    const result: { [key: number]: { aInvestir: number } } = {};
+    Object.entries(sum7Days).forEach(([gabId, data]) => {
+      const numericGabId = parseInt(gabId);
+      result[numericGabId] = {
+        aInvestir: Math.max(0, data.consoTotal - data.cashDispo)
+      };
+    });
+    
+    // 7. Préparer les résultats pour le front-end avec toutes les informations nécessaires
+    const processedData: ATMData[] = atmStateData.map((atm: any) => {
+      // Convertir le numéro GAB en nombre pour faire correspondre avec le résultat
+      const gabId = atm['Numero GAB'];
+      const gabResult = result[gabId];
+      
+      // Trouver la pondération pour ce GAB
+      const gabPonderation = ponderation.find((p: any) => p['Numero GAB'] === gabId);
+      const ponderationValue = gabPonderation ? gabPonderation.ponderation : 0;
+      
+      // Calculer la consommation moyenne sur 7 jours (pour l'affichage)
+      let consoMoyenne7j = 0;
+      if (next7DaysPrevisions.length > 0) {
+        const totalConso = next7DaysPrevisions.reduce((sum: number, prev: any) => {
+          return sum + (prev.conso_journaliere * ponderationValue);
+        }, 0);
+        consoMoyenne7j = totalConso / next7DaysPrevisions.length;
+      }
+      
+      return {
+        numeroGAB: gabId,
+        nomGAB: atm['Mon GAB'],
+        cashDisponible: atm['Cash Disponible'],
+        nbrJour: atm['Nbr JOUR'],
+        consoMoyenne7j,
+        aInvestir: gabResult ? gabResult.aInvestir : 0
+      };
+    });
+    
+    // Sauvegarder dans le cache
+    uploadCache[uploadId] = {
+      fileName: `etat_gab_${uploadId}.xlsx`,
+      uploadDate: new Date(),
+      atmData: processedData,
+      rawData: {
+        atmState: atmStateData,
+        ponderation,
+        previsions,
+        result: Object.entries(result).map(([gabId, data]) => ({
+          'Numero GAB': parseInt(gabId),
+          'À investir': data.aInvestir
+        }))
+      }
     };
-  });
-  
-  // Sauvegarder dans le cache
-  uploadCache[uploadId] = {
-    fileName: `etat_gab_${uploadId}.xlsx`,
-    uploadDate: new Date(),
-    atmData: processedData,
-    rawData: {
-      atmState: atmStateData,
-      ponderation,
-      previsions
-    }
-  };
-  
-  return processedData;
+    
+    return processedData;
+  } catch (error) {
+    console.error('Erreur lors du traitement des données:', error);
+    // En cas d'erreur, utiliser les données mock
+    return mockAtmData;
+  }
 };
 
 // Mock data pour démonstration
@@ -248,13 +338,21 @@ export const api = {
       }
       
       // Préparer les données pour le fichier de résultats
-      const atmData = uploadCache[uploadId].atmData;
-      const resultData = atmData
-        .filter(atm => atm.nbrJour <= 3 && atm.aInvestir > 0)
-        .map(atm => ({
-          'Numero GAB': atm.numeroGAB,
-          'À investir': atm.aInvestir
-        }));
+      let resultData;
+      
+      if (uploadCache[uploadId].rawData && uploadCache[uploadId].rawData.result) {
+        // Utiliser les résultats précalculés selon l'algorithme correct
+        resultData = uploadCache[uploadId].rawData.result;
+      } else {
+        // Fallback: Filtrer les GAB critiques et inclure les montants à investir
+        const atmData = uploadCache[uploadId].atmData;
+        resultData = atmData
+          .filter(atm => atm.nbrJour <= 3 && atm.aInvestir > 0)
+          .map(atm => ({
+            'Numero GAB': atm.numeroGAB,
+            'À investir': atm.aInvestir
+          }));
+      }
       
       // Créer un workbook et l'exporter
       const workbook = XLSX.utils.book_new();
