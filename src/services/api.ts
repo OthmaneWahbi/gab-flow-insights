@@ -119,7 +119,7 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
     // Inner‐join en string ≡ string via la map
     const criticalAtmsWithPonderation = criticalAtms
       .map((atm: any) => {
-        const key = toKey(atm['Numero GAB']);
+        const key = asKey(atm['Numero GAB']);
         const pond = ponderationMap[key];
         return pond !== undefined
           ? {
