@@ -7,7 +7,7 @@ const asKey = (v: unknown) => String(v).trim();
 
 
 // Chemins vers les fichiers Excel
-const DATA_FOLDER = '/data';
+const DATA_FOLDER = `${import.meta.env.BASE_URL}data`;
 const PREVISIONS_PATH = `${DATA_FOLDER}/previsions.xlsx`;
 const PONDERATION_PATH = `${DATA_FOLDER}/ponderation_gab.xlsx`;
 const TEMP_UPLOADS_FOLDER = `${DATA_FOLDER}/uploads`;
