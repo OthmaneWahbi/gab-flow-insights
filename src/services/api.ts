@@ -139,7 +139,7 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
     
     const next7DaysPrevisions = previsions.filter((prev: any) => {
       const prevDate = new Date(prev.Date);
-      return prevDate >= today && prevDate < new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+      return prevDate >= today && prevDate < new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000);
     });
     
     // 3. Créer un produit cartésien (cross join) entre GABs critiques et prévisions
