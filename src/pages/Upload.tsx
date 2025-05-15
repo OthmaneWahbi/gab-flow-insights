@@ -218,6 +218,7 @@ const Upload: React.FC = () => {
           <li>Le fichier doit contenir les colonnes : Numero GAB, Mon GAB, Cash Disponible, Nbr JOUR.</li>
           <li>Une fois téléchargé, le système analysera les GABs critiques (Nbr JOUR &lt;= 3).</li>
           <li>Les résultats seront affichés sur le dashboard avec des recommandations.</li>
+          <li>L'application s'appuiera également sur les fichiers de prévisions et de pondération stockés dans le dossier /data.</li>
         </ul>
       </div>
     </div>

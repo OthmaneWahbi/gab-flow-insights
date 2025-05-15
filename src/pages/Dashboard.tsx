@@ -6,6 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
+// Fonction pour formater les valeurs monétaires en MAD
+const formatMAD = (value: number) => {
+  return `${value.toLocaleString('fr-MA')} MAD`;
+};
+
 const Dashboard: React.FC = () => {
   const { currentUploadId, atmData, setAtmData, isLoading, setIsLoading } = useAppContext();
   const [consumptionTrends, setConsumptionTrends] = useState<any>(null);
@@ -49,10 +54,10 @@ const Dashboard: React.FC = () => {
 
   // Prepare data for investment distribution pie chart
   const investmentRanges = [
-    { name: '0 €', value: atmData?.filter(atm => !atm.aInvestir || atm.aInvestir === 0).length || 0 },
-    { name: '1-1000 €', value: atmData?.filter(atm => atm.aInvestir && atm.aInvestir > 0 && atm.aInvestir <= 1000).length || 0 },
-    { name: '1001-5000 €', value: atmData?.filter(atm => atm.aInvestir && atm.aInvestir > 1000 && atm.aInvestir <= 5000).length || 0 },
-    { name: '5001+ €', value: atmData?.filter(atm => atm.aInvestir && atm.aInvestir > 5000).length || 0 },
+    { name: '0 MAD', value: atmData?.filter(atm => !atm.aInvestir || atm.aInvestir === 0).length || 0 },
+    { name: '1-1000 MAD', value: atmData?.filter(atm => atm.aInvestir && atm.aInvestir > 0 && atm.aInvestir <= 1000).length || 0 },
+    { name: '1001-5000 MAD', value: atmData?.filter(atm => atm.aInvestir && atm.aInvestir > 1000 && atm.aInvestir <= 5000).length || 0 },
+    { name: '5001+ MAD', value: atmData?.filter(atm => atm.aInvestir && atm.aInvestir > 5000).length || 0 },
   ];
   
   // Colors for the pie chart
@@ -144,7 +149,7 @@ const Dashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{totalInvestment.toLocaleString('fr-FR')} €</div>
+            <div className="text-3xl font-bold">{formatMAD(totalInvestment)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Total à investir sur les 7 prochains jours
             </p>
@@ -159,9 +164,8 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {atmData
-                .reduce((sum, atm) => sum + (atm.consoMoyenne7j || 0), 0)
-                .toLocaleString('fr-FR')} €
+              {formatMAD(atmData
+                .reduce((sum, atm) => sum + (atm.consoMoyenne7j || 0), 0))}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Consommation moyenne sur 7 jours
@@ -196,13 +200,13 @@ const Dashboard: React.FC = () => {
                       <tr key={atm.numeroGAB} className="hover:bg-muted/30 transition-colors">
                         <td className="py-3 px-4">{atm.numeroGAB}</td>
                         <td className="py-3 px-4">{atm.nomGAB}</td>
-                        <td className="py-3 px-4">{atm.cashDisponible.toLocaleString('fr-FR')} €</td>
+                        <td className="py-3 px-4">{formatMAD(atm.cashDisponible)}</td>
                         <td className="py-3 px-4 font-medium" style={{ color: atm.nbrJour <= 1 ? 'var(--destructive)' : '' }}>
                           {atm.nbrJour.toFixed(1)}
                         </td>
-                        <td className="py-3 px-4">{atm.consoMoyenne7j?.toLocaleString('fr-FR')} €</td>
+                        <td className="py-3 px-4">{formatMAD(atm.consoMoyenne7j || 0)}</td>
                         <td className="py-3 px-4 font-medium" style={{ color: atm.aInvestir ? 'var(--accent)' : '' }}>
-                          {(atm.aInvestir || 0).toLocaleString('fr-FR')} €
+                          {formatMAD(atm.aInvestir || 0)}
                         </td>
                       </tr>
                     ))}
@@ -226,7 +230,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => `${value.toLocaleString('fr-FR')} €`} />
+                <Tooltip formatter={(value: number) => formatMAD(value)} />
                 <Legend />
                 {consumptionTrends && Object.keys(consumptionTrends.data).map((gabId, index) => (
                   <Line 
@@ -254,7 +258,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => `${value.toLocaleString('fr-FR')} €`} />
+                <Tooltip formatter={(value: number) => formatMAD(value)} />
                 <Bar dataKey="investment" fill="hsl(var(--primary))" />
               </BarChart>
             </ResponsiveContainer>

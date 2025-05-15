@@ -44,7 +44,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </Button>
-            <h1 className="text-lg font-semibold">GAB Flow Insights</h1>
+            <div className="flex items-center">
+              <img 
+                src="/lovable-uploads/ed41a403-5deb-458c-93d6-09010ad4f480.png" 
+                alt="CDM Logo" 
+                className="h-8 mr-3" 
+              />
+              <h1 className="text-lg font-semibold">GAB Flow Insights</h1>
+            </div>
           </div>
           
           <div className="flex items-center">

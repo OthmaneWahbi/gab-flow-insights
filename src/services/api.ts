@@ -1,7 +1,23 @@
 
 import { ATMData } from '../context/AppContext';
 
-// Mock data for demonstration
+// Chemins vers les fichiers Excel
+const DATA_FOLDER = '/data';
+const PREVISIONS_PATH = `${DATA_FOLDER}/previsions.xlsx`;
+const PONDERATION_PATH = `${DATA_FOLDER}/ponderation_gab.xlsx`;
+
+// Vérifier si les fichiers existent
+const checkFileExists = async (path: string): Promise<boolean> => {
+  try {
+    const response = await fetch(path, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error(`Erreur lors de la vérification du fichier ${path}:`, error);
+    return false;
+  }
+};
+
+// Mock data pour démonstration
 const mockAtmData: ATMData[] = [
   { numeroGAB: 1001, nomGAB: "Agence Centrale", cashDisponible: 12500, nbrJour: 1.2, consoMoyenne7j: 8400, aInvestir: 6300 },
   { numeroGAB: 1002, nomGAB: "Centre Commercial", cashDisponible: 8700, nbrJour: 2.1, consoMoyenne7j: 4100, aInvestir: 0 },
@@ -24,43 +40,49 @@ const mockDailyConsumption = {
 
 export const api = {
   uploadFile: async (file: File): Promise<{ uploadId: string }> => {
-    // Simulate API delay
+    // Simuler un délai API
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // In a real app, this would send the file to the backend
-    console.log('File uploaded:', file.name);
+    // Dans une vraie application, cela enverrait le fichier au backend
+    console.log('Fichier téléchargé:', file.name);
     
-    // Generate a random upload ID
+    // Générer un ID d'upload aléatoire
     const uploadId = Math.random().toString(36).substring(2, 15);
     
     return { uploadId };
   },
   
   getDashboardData: async (uploadId: string): Promise<{ atmData: ATMData[] }> => {
-    // Simulate API delay
+    // Vérifier si les fichiers existent
+    const previsionsExist = await checkFileExists(PREVISIONS_PATH);
+    const ponderationExist = await checkFileExists(PONDERATION_PATH);
+    
+    console.log(`Fichiers existants: prévisions=${previsionsExist}, pondération=${ponderationExist}`);
+    
+    // Simuler un délai API
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // In a real app, this would fetch data based on the upload ID
-    console.log('Fetching dashboard data for upload ID:', uploadId);
+    // Dans une vraie application, ceci utiliserait les fichiers si présents
+    console.log('Récupération des données pour ID upload:', uploadId);
     
     return { atmData: mockAtmData };
   },
   
   getConsumptionTrends: async (): Promise<typeof mockDailyConsumption> => {
-    // Simulate API delay
+    // Simuler un délai API
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     return mockDailyConsumption;
   },
   
   downloadResults: async (uploadId: string): Promise<void> => {
-    // Simulate API delay
+    // Simuler un délai API
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // In a real app, this would trigger a file download
-    console.log('Downloading results for upload ID:', uploadId);
+    // Dans une vraie application, ceci déclencherait un téléchargement de fichier
+    console.log('Téléchargement des résultats pour ID upload:', uploadId);
     
-    // Simulate a file download by creating and clicking an anchor element
+    // Simuler un téléchargement de fichier en créant et cliquant sur un élément d'ancrage
     alert('Le téléchargement du fichier résultat commencerait ici');
   }
 };
