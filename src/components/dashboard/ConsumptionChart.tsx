@@ -7,7 +7,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 const formatMAD = (value: number) => {
   return `${value.toLocaleString('fr-MA')} MAD`;
 };
-
+const SELECTED_GABS = ['210950010','211080015','211320015','211330014'];
 interface ConsumptionChartProps {
   consumptionTrends: {
     dates: string[];
@@ -35,9 +35,11 @@ const ConsumptionChart: React.FC<ConsumptionChartProps> = ({ consumptionTrends }
   const chartData = consumptionTrends.dates.map((date, index) => {
     const dataPoint: any = { date };
     
-    Object.entries(consumptionTrends.data).forEach(([gabId, values]) => {
-      dataPoint[`GAB ${gabId}`] = values[index];
-    });
+    Object.entries(consumptionTrends.data)
+      .filter(([gabId]) => SELECTED_GABS.includes(gabId))
+      .forEach(([gabId, values]) => {
+        dataPoint[`GAB ${gabId}`] = values[index];
+      });
     
     return dataPoint;
   });
@@ -58,7 +60,7 @@ const ConsumptionChart: React.FC<ConsumptionChartProps> = ({ consumptionTrends }
             <YAxis />
             <Tooltip formatter={(value: number) => formatMAD(value)} />
             <Legend />
-            {consumptionTrends && Object.keys(consumptionTrends.data).map((gabId, index) => (
+            {SELECTED_GABS.map((gabId, index) => (
               <Line 
                 key={gabId}
                 type="monotone"
