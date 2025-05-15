@@ -32,12 +32,8 @@ const InvestmentCharts: React.FC<InvestmentChartsProps> = ({ atmData }) => {
     value: atmData.filter(atm => atm.aInvestir === 0).length
   },
   {
-    name: '1-300 000 MAD',
-    value: atmData.filter(atm => atm.aInvestir > 0 && atm.aInvestir <= 300_000).length
-  },
-  {
-    name: '300 001-600 000 MAD',
-    value: atmData.filter(atm => atm.aInvestir > 300_000 && atm.aInvestir <= 600_000).length
+    name: '1-600 000 MAD',
+    value: atmData.filter(atm => atm.aInvestir > 1 && atm.aInvestir <= 600_000).length
   },
   {
     name: '600 001-1 200 000 MAD',
