@@ -116,18 +116,21 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
     const criticalAtms = atmStateData.filter((atm: any) => atm['Nbr JOUR'] <= 3);
     
     // Fusionner avec les données de pondération (inner join)
+    // Inner‐join en string ≡ string via la map
     const criticalAtmsWithPonderation = criticalAtms
       .map((atm: any) => {
-        const ponder = ponderationMap[asKey(atm['Numero GAB'])];
-        return ponder !== undefined
+        const key = toKey(atm['Numero GAB']);
+        const pond = ponderationMap[key];
+        return pond !== undefined
           ? {
               'Numero GAB': atm['Numero GAB'],
               'Cash Disponible': atm['Cash Disponible'],
-              'ponderation': ponder
+              'ponderation': pond
             }
           : null;
       })
-      .filter(Boolean);
+      .filter((item): item is { 'Numero GAB': any; 'Cash Disponible': any; ponderation: number } => item !== null);
+
 
     
     // 2. Récupérer les prévisions pour les 7 prochains jours
