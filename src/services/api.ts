@@ -194,13 +194,14 @@ const processAtmData = async (atmStateData: any[], uploadId: string): Promise<AT
       const ponderationValue = gabPonderation ? gabPonderation.ponderation : 0;
       
       // Calculer la consommation moyenne sur 7 jours (pour l'affichage)
-      let consoMoyenne7j = 0;
-      if (next7DaysPrevisions.length > 0) {
-        const totalConso = next7DaysPrevisions.reduce((sum: number, prev: any) => {
-          return sum + (prev.conso_journaliere * ponderationValue);
-        }, 0);
-        consoMoyenne7j = totalConso / next7DaysPrevisions.length;
-      }
+      // Nouveau calcul : on réutilise sum7Days
+      const key = asKey(atm['Numero GAB']);
+      const aggregate = sum7Days[key] ?? { consoTotal: 0 };
+      const daysCount = next7DaysPrevisions.length;
+      const consoMoyenne7j = daysCount > 0
+        ? aggregate.consoTotal / daysCount
+        : 0;
+
       
       return {
         numeroGAB: gabId,
@@ -319,14 +320,49 @@ export const api = {
     return { atmData: mockAtmData };
   },
   
-  getConsumptionTrends: async (uploadId?: string): Promise<typeof mockDailyConsumption> => {
-    // Simuler un délai API
+  getConsumptionTrends: async (uploadId?: string): Promise<{ dates: string[]; data: Record<string, number[]> }> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Si un uploadId est fourni et qu'il existe dans le cache, on pourrait retourner des données personnalisées
-    // Pour l'instant, on retourne simplement les mock data
-    return mockDailyConsumption;
+    // Si on a un uploadId en cache, on génère les vraies tendances
+    if (uploadId && uploadCache[uploadId]?.rawData) {
+      const { rawData } = uploadCache[uploadId];
+      const previsions = (rawData.previsions as any[])
+        .map(p => ({ Date: new Date(p.Date), conso_journaliere: p.conso_journaliere }));
+      const ponder = rawData.ponderation as any[];
+      const ponderMap: Record<string, number> = Object.fromEntries(
+        ponder.map(p => [ asKey(p['Numero GAB']), Number(p.ponderation) ])
+      );
+      // Filtrer les 7 prochains jours
+      const today = new Date(); today.setHours(0,0,0,0);
+      const next7 = previsions.filter(p =>
+        p.Date >= today &&
+        p.Date < new Date(today.getTime() + 7*24*60*60*1000)
+      );
+      // Construire la série par GAB
+      const trends: Record<string, number[]> = {};
+      next7.forEach(day => {
+        const dateKey = day.Date.toISOString().slice(0,10);
+        if (!trends.dates) trends.dates = [];
+        (trends.dates ||= []).push(dateKey);
+        ponder.forEach(p => {
+          const key = asKey(p['Numero GAB']);
+          const pondVal = ponderMap[key];
+          const conso = day.conso_journaliere * pondVal;
+          trends[key] = trends[key] || [];
+          trends[key].push(conso);
+        });
+      });
+      return {
+        dates: next7.map(d => d.Date.toISOString().slice(0,10)),
+        data: trends
+      };
+    }
+    // Sinon fallback
+    return {
+      dates: mockDailyConsumption.dates,
+      data: mockDailyConsumption.data
+    };
   },
+
   
   getUploadHistory: async (): Promise<Array<{ id: string, fileName: string, date: Date }>> => {
     // Retourner l'historique des uploads à partir du cache
